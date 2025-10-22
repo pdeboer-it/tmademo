@@ -122,13 +122,23 @@ jobs:
           rm -f ../app.zip || true
           zip -r ../app.zip .
 
-      - name: Deploy API to Azure Web App (config-zip)
+      - name: Deploy API (try config-zip, fallback to webapp deploy)
         shell: bash
         run: |
-          az webapp deployment source config-zip \
-            -g "$RESOURCE_GROUP" \
-            -n "$WEBAPP_NAME" \
-            --src src/api/app.zip
+          set +e
+          az webapp deployment source config-zip -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME" --src src/api/app.zip
+          STATUS=$?
+          if [ $STATUS -ne 0 ]; then
+            echo "config-zip failed (exit $STATUS), falling back to az webapp deploy"
+            az extension add --name webapp --upgrade
+            az webapp deploy \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$WEBAPP_NAME" \
+              --src-path src/api/app.zip \
+              --type zip \
+              --clean true
+          fi
+          set -e
 
       - name: Restart Web App
         run: az webapp restart -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME"
