@@ -67,16 +67,14 @@ resource ai 'Microsoft.Insights/components@2020-02-02' = {
 }
 
 resource appSettings 'Microsoft.Web/sites/config@2023-12-01' = {
-  name: '${site.name}/appsettings'
+  name: 'appsettings'
+  parent: site
   properties: {
-    'APPLICATIONINSIGHTS_CONNECTION_STRING': ai.properties.ConnectionString
-    'APPINSIGHTS_INSTRUMENTATIONKEY': ai.properties.InstrumentationKey
-    'ASPNETCORE_ENVIRONMENT': 'Production'
-    'WEBSITE_RUN_FROM_PACKAGE': '1'
+    APPLICATIONINSIGHTS_CONNECTION_STRING: ai.properties.ConnectionString
+    APPINSIGHTS_INSTRUMENTATIONKEY: ai.properties.InstrumentationKey
+    ASPNETCORE_ENVIRONMENT: 'Production'
+    WEBSITE_RUN_FROM_PACKAGE: '1'
   }
-  dependsOn: [
-    site
-  ]
 }
 
 output webAppNameOut string = site.name
