@@ -98,6 +98,12 @@ jobs:
           parameters: appServicePlanName=${{ env.PLAN_NAME }} webAppName=${{ env.WEBAPP_NAME }} skuName=${{ env.PLAN_SKU }} ${{ inputs.bicepParameters }}
           failOnStdErr: false
 
+      - name: Enforce .NET 9 runtime and clear startup
+        shell: bash
+        run: |
+          az webapp config set -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME" --startup-file ""
+          az webapp config set -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME" --linux-fx-version "DOTNET|9.0"
+
       - name: Build API
         working-directory: src/api
         run: |
@@ -120,6 +126,3 @@ jobs:
             --src-path src/api/app.zip \
             --type zip \
             --clean true
-
-      - name: Web App URL
-        run: echo "https://${WEBAPP_NAME}.azurewebsites.net"

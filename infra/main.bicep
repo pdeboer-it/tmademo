@@ -47,6 +47,7 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
     serverFarmId: plan.id
     siteConfig: {
       linuxFxVersion: linuxFxVersion
+      appCommandLine: ''
       alwaysOn: true
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
@@ -74,6 +75,15 @@ resource appSettings 'Microsoft.Web/sites/config@2023-12-01' = {
     APPINSIGHTS_INSTRUMENTATIONKEY: ai.properties.InstrumentationKey
     ASPNETCORE_ENVIRONMENT: 'Production'
     WEBSITE_RUN_FROM_PACKAGE: '1'
+    SCM_DO_BUILD_DURING_DEPLOYMENT: 'false'
+  }
+}
+
+resource siteMetadata 'Microsoft.Web/sites/config@2023-12-01' = {
+  name: 'metadata'
+  parent: site
+  properties: {
+    CURRENT_STACK: 'dotnet'
   }
 }
 
