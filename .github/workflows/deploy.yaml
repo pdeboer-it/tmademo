@@ -104,11 +104,12 @@ jobs:
           dotnet restore
           dotnet publish -c Release -o ./publish
 
-      - name: Package API
+      - name: Package API (zip publish contents)
+        shell: bash
         run: |
-          cd src/api
-          rm -f publish.zip || true
-          zip -r publish.zip publish
+          cd src/api/publish
+          rm -f ../app.zip || true
+          zip -r ../app.zip .
 
       - name: Deploy API to Azure Web App
         shell: bash
@@ -116,7 +117,7 @@ jobs:
           az webapp deploy \
             --resource-group "$RESOURCE_GROUP" \
             --name "$WEBAPP_NAME" \
-            --src-path src/api/publish.zip \
+            --src-path src/api/app.zip \
             --type zip \
             --clean true
 
