@@ -42,7 +42,7 @@ permissions:
 # Configure these as Repository Variables (Settings → Variables → Actions)
 # Or pass via workflow_dispatch inputs when running manually
 env:
-  RESOURCE_GROUP: ${{ inputs.resourceGroup || vars.AZURE_RESOURCE_GROUP }}
+  RESOURCE_GROUP: ${{ inputs.resourceGroup || vars.AZURE_RESOURCE_GROUP || 'tmademo-rg' }}
   LOCATION: ${{ inputs.location || vars.AZURE_LOCATION || 'eastus' }}
   WEBAPP_NAME: ${{ inputs.webAppName || vars.AZURE_WEBAPP_NAME }}
   PLAN_NAME: ${{ inputs.planName || vars.AZURE_PLAN_NAME || 'tmademo-plan' }}
