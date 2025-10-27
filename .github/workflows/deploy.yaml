@@ -71,6 +71,9 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Ensure CLI webapp extension
+        run: az extension add --name webapp --upgrade
+
       - name: Ensure Resource Group
         shell: bash
         run: |
@@ -95,19 +98,11 @@ jobs:
           parameters: appServicePlanName=${{ env.PLAN_NAME }} webAppName=${{ env.WEBAPP_NAME }} skuName=${{ env.PLAN_SKU }} ${{ inputs.bicepParameters }}
           failOnStdErr: false
 
-      - name: Force .NET 9 runtime via ARM
+      - name: Enforce .NET 9 runtime and clear startup
         shell: bash
         run: |
-          az resource update \
-            --resource-group "$RESOURCE_GROUP" \
-            --resource-type "Microsoft.Web/sites" \
-            --name "$WEBAPP_NAME" \
-            --set properties.siteConfig.linuxFxVersion="DOTNET|9.0" properties.siteConfig.appCommandLine=""
-          az resource update \
-            --resource-group "$RESOURCE_GROUP" \
-            --resource-type "Microsoft.Web/sites/config" \
-            --name "$WEBAPP_NAME/metadata" \
-            --set properties.CURRENT_STACK="dotnet"
+          az webapp config set -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME" --startup-file ""
+          az webapp config set -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME" --linux-fx-version "DOTNET|9.0"
 
       - name: Build API
         working-directory: src/api
@@ -122,26 +117,12 @@ jobs:
           rm -f ../app.zip || true
           zip -r ../app.zip .
 
-      - name: Deploy API (try config-zip, fallback to webapp deploy)
+      - name: Deploy API to Azure Web App
         shell: bash
         run: |
-          set +e
-          az webapp deployment source config-zip -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME" --src src/api/app.zip
-          STATUS=$?
-          if [ $STATUS -ne 0 ]; then
-            echo "config-zip failed (exit $STATUS), falling back to az webapp deploy"
-            az extension add --name webapp --upgrade
-            az webapp deploy \
-              --resource-group "$RESOURCE_GROUP" \
-              --name "$WEBAPP_NAME" \
-              --src-path src/api/app.zip \
-              --type zip \
-              --clean true
-          fi
-          set -e
-
-      - name: Restart Web App
-        run: az webapp restart -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME"
-
-      - name: Web App URL
-        run: echo "https://${WEBAPP_NAME}.azurewebsites.net"
+          az webapp deploy \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$WEBAPP_NAME" \
+            --src-path src/api/app.zip \
+            --type zip \
+            --clean true
