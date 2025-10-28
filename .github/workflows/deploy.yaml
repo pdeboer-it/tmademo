@@ -1,128 +1,76 @@
-name: Deploy Infra and API
+name: Build and deploy ASP.Net Core app to an Azure Web App
+
+env:
+  AZURE_WEBAPP_NAME: tmademoapi
+  AZURE_WEBAPP_PACKAGE_PATH: '.'
+  DOTNET_VERSION: '9.0.x'
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - infra/**
-      - src/api/**
-      - .github/workflows/deploy.yaml
+    branches: [ "main" ]
   workflow_dispatch:
-    inputs:
-      resourceGroup:
-        description: Azure Resource Group (overrides repo variable)
-        required: false
-        type: string
-      location:
-        description: Azure Region (overrides repo variable)
-        required: false
-        type: string
-      webAppName:
-        description: App Service name for API (overrides repo variable)
-        required: false
-        type: string
-      planName:
-        description: App Service Plan name (fallback creation)
-        required: false
-        type: string
-      planSku:
-        description: App Service Plan SKU (e.g., B1, S1)
-        required: false
-        type: string
-      bicepParameters:
-        description: Additional Bicep parameters as key=value pairs
-        required: false
-        type: string
 
 permissions:
-  id-token: write
   contents: read
 
-# Configure these as Repository Variables (Settings → Variables → Actions)
-# Or pass via workflow_dispatch inputs when running manually
-env:
-  RESOURCE_GROUP: ${{ inputs.resourceGroup || vars.AZURE_RESOURCE_GROUP || 'tmademo-rg' }}
-  LOCATION: ${{ inputs.location || vars.AZURE_LOCATION || 'eastus' }}
-  WEBAPP_NAME: ${{ inputs.webAppName || vars.AZURE_WEBAPP_NAME }}
-  PLAN_NAME: ${{ inputs.planName || vars.AZURE_PLAN_NAME || 'tmademo-plan' }}
-  PLAN_SKU: ${{ inputs.planSku || vars.AZURE_PLAN_SKU || 'B1' }}
-
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-${{ github.ref }}
-      cancel-in-progress: true
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up .NET 9 SDK
+      - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
+      - name: Set up dependency caching for faster builds
+        uses: actions/cache@v4
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
-      - name: Ensure CLI webapp extension
-        run: az extension add --name webapp --upgrade
-
-      - name: Ensure Resource Group
-        shell: bash
-        run: |
-          if [[ -z "${RESOURCE_GROUP}" ]]; then
-            echo "ERROR: RESOURCE_GROUP is not set. Define repo variable AZURE_RESOURCE_GROUP or pass input." >&2
-            exit 1
-          fi
-          if [[ -z "${WEBAPP_NAME}" ]]; then
-            echo "ERROR: WEBAPP_NAME is not set. Define repo variable AZURE_WEBAPP_NAME or pass input." >&2
-            exit 1
-          fi
-          az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
-
-      - name: Deploy Bicep to Resource Group
-        uses: azure/arm-deploy@v2
-        with:
-          scope: resourcegroup
-          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resourceGroupName: ${{ env.RESOURCE_GROUP }}
-          region: ${{ env.LOCATION }}
-          template: infra/main.bicep
-          parameters: appServicePlanName=${{ env.PLAN_NAME }} webAppName=${{ env.WEBAPP_NAME }} skuName=${{ env.PLAN_SKU }} ${{ inputs.bicepParameters }}
-          failOnStdErr: false
-
-      - name: Enforce .NET 9 runtime and clear startup
-        shell: bash
-        run: |
-          az webapp config set -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME" --startup-file ""
-          az webapp config set -g "$RESOURCE_GROUP" -n "$WEBAPP_NAME" --linux-fx-version "DOTNET|9.0"
-
-      - name: Build API
+      - name: Restore
         working-directory: src/api
-        run: |
-          dotnet restore
-          dotnet publish -c Release -o ./publish
+        run: dotnet restore
 
-      - name: Package API (zip publish contents)
-        shell: bash
-        run: |
-          cd src/api/publish
-          rm -f ../app.zip || true
-          zip -r ../app.zip .
+      - name: Build with dotnet
+        working-directory: src/api
+        run: dotnet build --configuration Release --no-restore
 
-      - name: Deploy API to Azure Web App
-        shell: bash
-        run: |
-          az webapp deploy \
-            --resource-group "$RESOURCE_GROUP" \
-            --name "$WEBAPP_NAME" \
-            --src-path src/api/app.zip \
-            --type zip \
-            --clean true
+      - name: dotnet publish
+        working-directory: src/api
+        run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp --no-restore
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-app
+          path: ${{env.DOTNET_ROOT}}/myapp
+
+  deploy:
+    permissions:
+      contents: none
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+          path: ./
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
