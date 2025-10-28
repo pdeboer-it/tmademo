@@ -10,8 +10,8 @@ param webAppName string
 @description('SKU for App Service Plan (e.g., B1, S1, P1v3)')
 param skuName string = 'B1'
 
-@description('Linux runtime stack for the Web App')
-param linuxFxVersion string = 'DOTNET|9.0'
+@description('DotNet version for the Web App')
+param dotNetVersion string = 'v9.0'
 
 @description('Application Insights resource name')
 param appInsightsName string = '${webAppName}-ai'
@@ -34,20 +34,19 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
     capacity: 1
   }
   properties: {
-    reserved: true // Linux
+    reserved: false
   }
-  kind: 'app,linux'
+  kind: 'app,windows'
 }
 
 resource site 'Microsoft.Web/sites@2023-12-01' = {
   name: webAppName
   location: location
-  kind: 'app,linux'
+  kind: 'app,windows'
   properties: {
     serverFarmId: plan.id
     siteConfig: {
-      linuxFxVersion: linuxFxVersion
-      appCommandLine: ''
+      netFrameworkVersion: dotNetVersion
       alwaysOn: true
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
