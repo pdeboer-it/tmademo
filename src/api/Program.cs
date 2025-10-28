@@ -1,8 +1,17 @@
+using api.Data;
+using api.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+	options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+});
 
 var app = builder.Build();
 
@@ -14,28 +23,58 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
 
-app.MapGet("/weatherforecast", () =>
+// Apply pending EF Core migrations at startup
+using (var scope = app.Services.CreateScope())
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+	var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+	db.Database.Migrate();
+}
+
+// Simple DB health check
+app.MapGet("/health/db", async (AppDbContext context) =>
+{
+	try
+	{
+		var canConnect = await context.Database.CanConnectAsync();
+		var pending = await context.Database.GetPendingMigrationsAsync();
+		return Results.Ok(new
+		{
+			connected = canConnect,
+			pendingMigrations = pending
+		});
+	}
+	catch (Exception ex)
+	{
+		return Results.Problem(ex.Message);
+	}
 })
-.WithName("GetWeatherForecast");
+.WithName("DbHealth")
+.WithOpenApi();
+
+
+app.MapGet("/candidates", async (AppDbContext context) =>
+{
+    return await context.Candidates.ToListAsync();
+})
+.WithName("GetCandidates")
+.WithOpenApi();
+
+app.MapGet("/candidates/{id}", async (AppDbContext context, int id) =>
+{
+    return await context.Candidates.FindAsync(id);
+})
+.WithName("GetCandidate")
+.WithOpenApi();
+
+app.MapPost("/candidates", async (AppDbContext context, Candidate candidate) =>
+{
+    await context.Candidates.AddAsync(candidate);
+    await context.SaveChangesAsync();
+    return candidate;
+})
+.WithName("CreateCandidate")
+.WithOpenApi();
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
