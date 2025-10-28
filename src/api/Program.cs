@@ -3,6 +3,8 @@ using api.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,6 +47,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 		};
 	});
 builder.Services.AddAuthorization();
+
+// Distributed cache (Redis if configured, else in-memory)
+var redisConnection = builder.Configuration.GetConnectionString("Redis")
+	?? builder.Configuration["Redis:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(redisConnection))
+{
+	builder.Services.AddStackExchangeRedisCache(options =>
+	{
+		options.Configuration = redisConnection;
+	});
+}
+else
+{
+	builder.Services.AddDistributedMemoryCache();
+}
 
 var app = builder.Build();
 
@@ -98,9 +115,25 @@ app.MapGet("/health/db", async (AppDbContext context) =>
 .WithOpenApi();
 
 
-app.MapGet("/candidates", async (AppDbContext context) =>
+app.MapGet("/candidates", async (AppDbContext context, IDistributedCache cache) =>
 {
-    return await context.Candidates.ToListAsync();
+    const string cacheKey = "candidates_all";
+    var cached = await cache.GetStringAsync(cacheKey);
+    if (cached != null)
+    {
+    	var fromCache = JsonSerializer.Deserialize<List<Candidate>>(cached);
+    	return Results.Ok(fromCache);
+    }
+
+    var list = await context.Candidates.ToListAsync();
+    await cache.SetStringAsync(
+    	cacheKey,
+    	JsonSerializer.Serialize(list),
+    	new DistributedCacheEntryOptions
+    	{
+    		AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
+    	});
+    return Results.Ok(list);
 })
 .WithName("GetCandidates")
 .RequireAuthorization()
@@ -114,10 +147,11 @@ app.MapGet("/candidates/{id}", async (AppDbContext context, int id) =>
 .RequireAuthorization()
 .WithOpenApi();
 
-app.MapPost("/candidates", async (AppDbContext context, Candidate candidate) =>
+app.MapPost("/candidates", async (AppDbContext context, Candidate candidate, IDistributedCache cache) =>
 {
     await context.Candidates.AddAsync(candidate);
     await context.SaveChangesAsync();
+    await cache.RemoveAsync("candidates_all");
     return candidate;
 })
 .WithName("CreateCandidate")
