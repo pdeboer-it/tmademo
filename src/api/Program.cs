@@ -28,7 +28,16 @@ app.UseHttpsRedirection();
 using (var scope = app.Services.CreateScope())
 {
 	var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-	db.Database.Migrate();
+	var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+	try
+	{
+		db.Database.Migrate();
+		logger.LogInformation("Database migration completed successfully.");
+	}
+	catch (Exception ex)
+	{
+		logger.LogError(ex, "Database migration failed at startup.");
+	}
 }
 
 // Simple DB health check
