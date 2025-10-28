@@ -36,7 +36,7 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   properties: {
     reserved: true // Linux
   }
-  kind: 'linux'
+  kind: 'app,linux'
 }
 
 resource site 'Microsoft.Web/sites@2023-12-01' = {
@@ -76,14 +76,6 @@ resource appSettings 'Microsoft.Web/sites/config@2023-12-01' = {
     ASPNETCORE_ENVIRONMENT: 'Production'
     WEBSITE_RUN_FROM_PACKAGE: '1'
     SCM_DO_BUILD_DURING_DEPLOYMENT: 'false'
-  }
-}
-
-resource siteMetadata 'Microsoft.Web/sites/config@2023-12-01' = {
-  name: 'metadata'
-  parent: site
-  properties: {
-    CURRENT_STACK: 'dotnet'
   }
 }
 
