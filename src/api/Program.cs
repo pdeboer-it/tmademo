@@ -31,6 +31,9 @@ builder.Services.AddCors(options =>
 // JWT Bearer authentication (Microsoft Entra ID)
 var authority = builder.Configuration["Jwt:Authority"];
 var audience = builder.Configuration["Jwt:Audience"];
+var apiClientId = audience?.StartsWith("api://", StringComparison.OrdinalIgnoreCase) == true
+	? audience.Substring("api://".Length)
+	: audience;
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 	.AddJwtBearer(options =>
 	{
@@ -38,7 +41,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 		options.TokenValidationParameters = new TokenValidationParameters
 		{
 			ValidateIssuer = true,
-			ValidAudience = audience
+			ValidAudiences = new[] { audience, apiClientId }
 		};
 	});
 builder.Services.AddAuthorization();
