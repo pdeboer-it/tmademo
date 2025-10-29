@@ -6,6 +6,9 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using Microsoft.OpenApi.Models;
+using Azure;
+using Azure.Search.Documents;
+using Azure.Search.Documents.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -158,7 +161,7 @@ app.MapPost("/candidates", async (AppDbContext context, Candidate candidate, IDi
 .RequireAuthorization()
 .WithOpenApi();
 
-app.MapPost("/search/candidates", async (AppDbContext context, Candidate candidate, IDistributedCache cache) =>
+app.MapGet("/search", async (IConfiguration cfg, string q) =>
 {
     var endpoint = new Uri(cfg["Search:Endpoint"]!);
     var indexName = cfg["Search:IndexName"]!;
@@ -166,7 +169,7 @@ app.MapPost("/search/candidates", async (AppDbContext context, Candidate candida
 
     var client = new SearchClient(endpoint, indexName, key);
     var options = new SearchOptions { Size = 10 };
-    var results = await client.SearchAsync<SearchDocument>(q, options);
+    var results = await client.SearchAsync<SearchDocument>(string.IsNullOrWhiteSpace(q) ? "*" : q, options);
 
     var docs = new List<object>();
     await foreach (var r in results.Value.GetResultsAsync())
@@ -174,7 +177,7 @@ app.MapPost("/search/candidates", async (AppDbContext context, Candidate candida
 
     return Results.Ok(docs);
 })
-.WithName("SearchCandidates")
+.WithName("Search")
 .RequireAuthorization()
 .WithOpenApi();
 
