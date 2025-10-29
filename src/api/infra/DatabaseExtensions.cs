@@ -1,6 +1,5 @@
 using api.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 public static class DatabaseExtensions
 {

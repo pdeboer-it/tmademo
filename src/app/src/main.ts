@@ -35,7 +35,7 @@ if (!account) {
   console.log(token.accessToken)
 
   const response = await fetch(
-    'https://tmademoapi-e9brgbcacubfgqa3.westeurope-01.azurewebsites.net/candidates',
+    'https://tmademoapi-e9brgbcacubfgqa3.westeurope-01.azurewebsites.net/api/candidates',
     // 'http://localhost:5280/api/candidates',
     {
       headers: { Authorization: `Bearer ${token.accessToken}` },
