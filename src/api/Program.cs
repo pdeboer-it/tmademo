@@ -158,5 +158,25 @@ app.MapPost("/candidates", async (AppDbContext context, Candidate candidate, IDi
 .RequireAuthorization()
 .WithOpenApi();
 
+app.MapPost("/search/candidates", async (AppDbContext context, Candidate candidate, IDistributedCache cache) =>
+{
+    var endpoint = new Uri(cfg["Search:Endpoint"]!);
+    var indexName = cfg["Search:IndexName"]!;
+    var key = new AzureKeyCredential(cfg["Search:ApiKey"]!);
+
+    var client = new SearchClient(endpoint, indexName, key);
+    var options = new SearchOptions { Size = 10 };
+    var results = await client.SearchAsync<SearchDocument>(q, options);
+
+    var docs = new List<object>();
+    await foreach (var r in results.Value.GetResultsAsync())
+        docs.Add(r.Document);
+
+    return Results.Ok(docs);
+})
+.WithName("SearchCandidates")
+.RequireAuthorization()
+.WithOpenApi();
+
 app.Run();
 
