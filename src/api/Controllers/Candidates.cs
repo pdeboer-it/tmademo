@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using api.Data;
 using api.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -99,26 +94,6 @@ namespace api.Controllers
 
             return NoContent();
         }
-
-        // app.MapGet("/search", async (IConfiguration cfg, string q) =>
-        // {
-        //     var endpoint = new Uri(cfg["Search:Endpoint"]!);
-        //     var indexName = cfg["Search:IndexName"]!;
-        //     var key = new AzureKeyCredential(cfg["Search:ApiKey"]!);
-
-        //     var client = new SearchClient(endpoint, indexName, key);
-        //     var options = new SearchOptions { Size = 10 };
-        //     var results = await client.SearchAsync<SearchDocument>(string.IsNullOrWhiteSpace(q) ? "*" : q, options);
-
-        //     var docs = new List<object>();
-        //     await foreach (var r in results.Value.GetResultsAsync())
-        //         docs.Add(r.Document);
-
-        //     return Results.Ok(docs);
-        // })
-        // .WithName("Search")
-        // .RequireAuthorization()
-        // .WithOpenApi();
 
         private bool CandidateExists(int id)
         {
