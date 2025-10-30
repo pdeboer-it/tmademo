@@ -28,7 +28,7 @@ export async function login() {
   await ensureInitialized()
   let account = msal.getAllAccounts()[0]
   if (!account) {
-    await msal.loginRedirect({ scopes, redirectStartPage: window.location.href })
+    await msal.loginRedirect({ scopes, redirectStartPage: redirectUri })
   } else {
     const token = await msal.acquireTokenSilent({
       scopes,
