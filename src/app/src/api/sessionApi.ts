@@ -8,6 +8,7 @@ const msal = new PublicClientApplication({
     clientId: 'b1a5f44a-07f7-4780-9951-704bc4eef3c9',
     authority: 'https://login.microsoftonline.com/bf07dbcb-5446-466a-843b-35bbc7955e9d',
     redirectUri: window.location.origin,
+    navigateToLoginRequestUrl: false,
   },
   cache: { cacheLocation: 'localStorage' },
 })
