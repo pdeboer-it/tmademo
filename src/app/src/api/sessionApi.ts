@@ -1,4 +1,4 @@
-import { PublicClientApplication } from '@azure/msal-browser'
+import { EventType, PublicClientApplication } from '@azure/msal-browser'
 
 let msalReady: Promise<void> | null = null
 const scopes = ['api://eef58d6a-5358-4013-a7b0-c92bb0c4b6a8/api.read']
@@ -12,6 +12,13 @@ const msal = new PublicClientApplication({
     postLogoutRedirectUri: redirectUri,
   },
   cache: { cacheLocation: 'localStorage' },
+})
+
+msal.addEventCallback(async (event) => {
+  console.log(event)
+  if (event.eventType === EventType.LOGIN_SUCCESS) {
+    window.location.href = redirectUri
+  }
 })
 
 function ensureInitialized() {
